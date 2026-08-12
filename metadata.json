@@ -1,0 +1,8 @@
+{
+  "name": "Remix InvestPro - Daily Yield \u0026 Portfolio Portal",
+  "description": "Daily investment return platform featuring multi-role authentication (Admin, Agent, Client), automated yield tracking, deposit approval workflows, and admin withdrawal management.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
