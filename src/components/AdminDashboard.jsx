@@ -128,6 +128,71 @@ export const AdminDashboard = ({
   const [deletingUserConfirm, setDeletingUserConfirm] = useState(null);
   const [deletingUserLoading, setDeletingUserLoading] = useState(false);
 
+  // Admin Add User State
+  const [showAddUserModal, setShowAddUserModal] = useState(false);
+  const [addUserFullName, setAddUserFullName] = useState('');
+  const [addUserPhone, setAddUserPhone] = useState('');
+  const [addUserEmail, setAddUserEmail] = useState('');
+  const [addUserPassword, setAddUserPassword] = useState('');
+  const [addUserRole, setAddUserRole] = useState('client');
+  const [addUserInitialBalance, setAddUserInitialBalance] = useState(0);
+  const [addUserAgentCode, setAddUserAgentCode] = useState('');
+  const [addUserLoading, setAddUserLoading] = useState(false);
+  const [addUserError, setAddUserError] = useState(null);
+
+  const handleOpenAddUserModal = () => {
+    setAddUserFullName('');
+    setAddUserPhone('');
+    setAddUserEmail('');
+    setAddUserPassword('');
+    setAddUserRole('client');
+    setAddUserInitialBalance(0);
+    setAddUserAgentCode('');
+    setAddUserError(null);
+    setShowAddUserModal(true);
+  };
+
+  const handleCreateUserSubmit = async (e) => {
+    e.preventDefault();
+    setAddUserLoading(true);
+    setAddUserError(null);
+    try {
+      const res = await api.admin.createUser({
+        fullName: addUserFullName,
+        phone: addUserPhone,
+        email: addUserEmail,
+        password: addUserPassword,
+        role: addUserRole,
+        initialBalance: Number(addUserInitialBalance),
+        agentCode: addUserAgentCode
+      });
+      setLocalUsers(prev => [res.user, ...prev]);
+      setShowAddUserModal(false);
+    } catch (err) {
+      setAddUserError(err.message || 'Kurema umukoresha mushya byananiwe');
+    } finally {
+      setAddUserLoading(false);
+    }
+  };
+
+  const handleDeleteUserSubmit = async () => {
+    if (!deletingUserConfirm) return;
+    setDeletingUserLoading(true);
+    try {
+      if (onDeleteUser) {
+        await onDeleteUser(deletingUserConfirm.id);
+      } else {
+        await api.admin.deleteUser(deletingUserConfirm.id);
+      }
+      setLocalUsers(prev => prev.filter(u => u.id !== deletingUserConfirm.id));
+      setDeletingUserConfirm(null);
+    } catch (err) {
+      alert(err.message || 'Gusiba umukoresha byananiwe');
+    } finally {
+      setDeletingUserLoading(false);
+    }
+  };
+
   // Admin Assign Agent Modal State
   const [assigningClientUser, setAssigningClientUser] = useState(null);
   const [assigningAgentId, setAssigningAgentId] = useState('');
@@ -781,55 +846,66 @@ export const AdminDashboard = ({
                 <Users className="w-5 h-5 text-purple-400" />
                 Gucunga Abakoresha Bose ({localUsers.length})
               </h2>
-              <p className="text-xs text-slate-400 mt-0.5">Admin ashobora kureba abakoresha bose, guhindura amakuru yabo, guhindura uruhare rwabo, cyangwa ku basiba.</p>
+              <p className="text-xs text-slate-400 mt-0.5">Buri muntu wese wiyandikisha ahita ajya muri Database. Urashobora n'okumureba, guhindura amakuru ye, cyangwa kumusiba burundu.</p>
             </div>
 
-            {/* Role Filter Tabs */}
-            <div className="flex flex-wrap items-center gap-1.5 bg-slate-800/80 p-1.5 rounded-xl border border-slate-700/60">
+            <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
-                onClick={() => setUserRoleFilter('all')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                  userRoleFilter === 'all'
-                    ? 'bg-purple-600 text-white shadow'
-                    : 'text-slate-400 hover:text-white'
-                }`}
+                onClick={handleOpenAddUserModal}
+                className="px-3.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-purple-600/30 transition-all shrink-0"
               >
-                Bose ({localUsers.length})
+                <PlusCircle className="w-4 h-4" />
+                Umukoresha Mushya
               </button>
-              <button
-                type="button"
-                onClick={() => setUserRoleFilter('client')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                  userRoleFilter === 'client'
-                    ? 'bg-emerald-600 text-white shadow'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                Abakiriya ({localUsers.filter(u => u.role === 'client').length})
-              </button>
-              <button
-                type="button"
-                onClick={() => setUserRoleFilter('agent')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                  userRoleFilter === 'agent'
-                    ? 'bg-blue-600 text-white shadow'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                Aba Agent ({localUsers.filter(u => u.role === 'agent').length})
-              </button>
-              <button
-                type="button"
-                onClick={() => setUserRoleFilter('admin')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                  userRoleFilter === 'admin'
-                    ? 'bg-purple-800 text-white shadow'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                Aba Admin ({localUsers.filter(u => u.role === 'admin').length})
-              </button>
+
+              {/* Role Filter Tabs */}
+              <div className="flex flex-wrap items-center gap-1.5 bg-slate-800/80 p-1.5 rounded-xl border border-slate-700/60">
+                <button
+                  type="button"
+                  onClick={() => setUserRoleFilter('all')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                    userRoleFilter === 'all'
+                      ? 'bg-purple-600 text-white shadow'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Bose ({localUsers.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setUserRoleFilter('client')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                    userRoleFilter === 'client'
+                      ? 'bg-emerald-600 text-white shadow'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Abakiriya ({localUsers.filter(u => u.role === 'client').length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setUserRoleFilter('agent')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                    userRoleFilter === 'agent'
+                      ? 'bg-blue-600 text-white shadow'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Aba Agent ({localUsers.filter(u => u.role === 'agent').length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setUserRoleFilter('admin')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                    userRoleFilter === 'admin'
+                      ? 'bg-purple-800 text-white shadow'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Aba Admin ({localUsers.filter(u => u.role === 'admin').length})
+                </button>
+              </div>
             </div>
           </div>
 
@@ -1700,6 +1776,183 @@ export const AdminDashboard = ({
                 className="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-md shadow-rose-600/30"
               >
                 {txnActionLoading ? 'Biragihagarara...' : 'Siba Burundu'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CREATE NEW USER MODAL (ADMIN) */}
+      {showAddUserModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 overflow-y-auto">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-lg w-full shadow-2xl text-slate-100 my-6 space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <h3 className="text-base font-bold text-white flex items-center gap-2">
+                <PlusCircle className="w-5 h-5 text-purple-400" />
+                Gushyiraho Umukoresha Mushya muri Database
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowAddUserModal(false)}
+                className="text-slate-400 hover:text-white p-1"
+              >
+                ✕
+              </button>
+            </div>
+
+            {addUserError && (
+              <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{addUserError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleCreateUserSubmit} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">Izina Ryose (Full Name) *</label>
+                  <input
+                    type="text"
+                    required
+                    value={addUserFullName}
+                    onChange={(e) => setAddUserFullName(e.target.value)}
+                    placeholder="E.g. Keza Alice"
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-purple-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">Nimero ya Telefone *</label>
+                  <input
+                    type="text"
+                    required
+                    value={addUserPhone}
+                    onChange={(e) => setAddUserPhone(e.target.value)}
+                    placeholder="0788XXXXXX"
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-purple-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">Email (Niba ayifite)</label>
+                  <input
+                    type="email"
+                    value={addUserEmail}
+                    onChange={(e) => setAddUserEmail(e.target.value)}
+                    placeholder="Optional email"
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-purple-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">Umubare w'Ibanga (Password) *</label>
+                  <input
+                    type="password"
+                    required
+                    minLength={4}
+                    value={addUserPassword}
+                    onChange={(e) => setAddUserPassword(e.target.value)}
+                    placeholder="Umubare w'ibanga"
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-purple-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">Inshingano / Role *</label>
+                  <select
+                    value={addUserRole}
+                    onChange={(e) => setAddUserRole(e.target.value)}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-amber-300 font-bold focus:outline-none focus:border-purple-500 cursor-pointer"
+                  >
+                    <option value="client">Client (Umushoramari)</option>
+                    <option value="agent">Agent (Uwakira Deposit)</option>
+                    <option value="admin">Admin (Umuyobozi)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">Amafaranga yo Banza kumuha (FRW)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={addUserInitialBalance}
+                    onChange={(e) => setAddUserInitialBalance(Number(e.target.value))}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-emerald-400 font-bold focus:outline-none focus:border-purple-500 font-mono"
+                  />
+                </div>
+              </div>
+
+              {addUserRole === 'agent' && (
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">Kode ya Agent (Agent Code)</label>
+                  <input
+                    type="text"
+                    value={addUserAgentCode}
+                    onChange={(e) => setAddUserAgentCode(e.target.value)}
+                    placeholder="Ugereranyije: AGENT-KIGALI-1"
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-purple-500"
+                  />
+                </div>
+              )}
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setShowAddUserModal(false)}
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs"
+                >
+                  Hagarika
+                </button>
+                <button
+                  type="submit"
+                  disabled={addUserLoading}
+                  className="px-5 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-purple-600/30 transition-colors disabled:opacity-50"
+                >
+                  {addUserLoading ? (
+                    <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    'Emeza Umukoresha'
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* DELETE USER CONFIRMATION MODAL */}
+      {deletingUserConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
+          <div className="bg-slate-900 border border-rose-500/30 rounded-2xl p-6 max-w-md w-full shadow-2xl text-slate-100 space-y-4">
+            <div className="flex items-center gap-3 text-rose-400">
+              <Trash2 className="w-6 h-6 shrink-0" />
+              <h3 className="text-base font-bold text-white">Siba Konti y'Umukoresha?</h3>
+            </div>
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Wemeje gusiba burundu konti ya <strong className="text-white">{deletingUserConfirm.fullName}</strong> ({deletingUserConfirm.phone || deletingUserConfirm.email}).
+              <span className="block mt-2 text-rose-300 font-semibold bg-rose-500/10 p-2.5 rounded-xl border border-rose-500/20">
+                ⚠️ Ikitonderwa: Iki gikorwa ntigishobora gusubizwa nyuma. Amakuru yose ahita asibwa muri Database.
+              </span>
+            </p>
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setDeletingUserConfirm(null)}
+                className="px-4 py-2 rounded-xl bg-slate-800 text-xs font-semibold text-slate-300 hover:bg-slate-700"
+              >
+                Hagarika
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteUserSubmit}
+                disabled={deletingUserLoading}
+                className="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-md shadow-rose-600/30 flex items-center gap-1.5"
+              >
+                {deletingUserLoading ? (
+                  <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  'Siba Burundu'
+                )}
               </button>
             </div>
           </div>

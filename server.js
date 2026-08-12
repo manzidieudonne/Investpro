@@ -705,6 +705,51 @@ app.get('/api/admin/users', authenticateToken, requireAdmin, (req, res) => {
   }
 });
 
+app.post('/api/admin/users', authenticateToken, requireAdmin, (req, res) => {
+  try {
+    const { fullName, phone, email, password, role, agentCode, initialBalance } = req.body || {};
+    if (!fullName || !phone || !password) {
+      res.status(400).json({ error: 'Izina ryose, nimero ya telefone, n\'umubare w\'ibanga birakenewe.' });
+      return;
+    }
+
+    const phoneStr = String(phone).trim();
+    const phoneClean = db.cleanPhone(phoneStr);
+    if (!phoneClean || phoneClean.length < 8) {
+      res.status(400).json({ error: 'Nyamuneka andika nimero ya telefone y\'ukuri.' });
+      return;
+    }
+
+    const existingUser = db.findUserByPhone(phoneStr);
+    if (existingUser) {
+      res.status(400).json({ error: 'Iyi nimero ya telefone isanzwe ikoreshwa kuri indi konti.' });
+      return;
+    }
+
+    const salt = bcrypt.genSaltSync(10);
+    const passwordHash = bcrypt.hashSync(String(password).trim(), salt);
+    const userEmail = email ? String(email).trim().toLowerCase() : `${phoneClean}@phone.investpro.rw`;
+
+    const newUser = db.createUser({
+      email: userEmail,
+      passwordHash,
+      fullName: String(fullName).trim(),
+      phone: phoneStr,
+      role: (role === 'admin' || role === 'agent') ? role : 'client',
+      agentCode: agentCode ? String(agentCode).trim() : undefined
+    });
+
+    if (initialBalance && !isNaN(Number(initialBalance)) && Number(initialBalance) > 0) {
+      db.updateUser(newUser.id, { balance: Number(initialBalance) });
+      newUser.balance = Number(initialBalance);
+    }
+
+    res.status(201).json({ message: `Umukoresha ${newUser.fullName} yashyizwe muri database neza!`, user: newUser });
+  } catch (error) {
+    res.status(500).json({ error: error.message || 'Kurema umukoresha mushya byananiwe' });
+  }
+});
+
 app.delete('/api/admin/users/:id', authenticateToken, requireAdmin, (req, res) => {
   try {
     const targetUserId = req.params.id;

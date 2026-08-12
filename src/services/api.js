@@ -526,6 +526,17 @@ export const api = {
         return [];
       }
     },
+    createUser: async (data) => {
+      try {
+        return await fetchApi('/api/admin/users', {
+          method: 'POST',
+          body: JSON.stringify(data)
+        });
+      } catch (err) {
+        console.warn('Backend createUser failed', err);
+        throw err;
+      }
+    },
     updateUserRole: async (id, role) => {
       try {
         return await fetchApi(`/api/admin/users/${id}/role`, {
