@@ -92,15 +92,24 @@ export default function App() {
   const loadUserData = useCallback(async () => {
     if (!tokenStorage.get()) return;
 
+    let me = null;
     try {
-      const me = await api.auth.getMe();
+      me = await api.auth.getMe();
       if (!me) {
         tokenStorage.clear();
         setUser(null);
         return;
       }
       setUser(me);
+    } catch (authErr) {
+      console.warn('Authentication token invalid, expired, or user deleted. Resetting session.', authErr?.message || authErr);
+      tokenStorage.clear();
+      localStorage.removeItem('investpro_demo_user');
+      setUser(null);
+      return;
+    }
 
+    try {
       const [invs, deps, wths, txns, notifs] = await Promise.all([
         api.investments.getAll().catch(() => []),
         api.deposits.getAll().catch(() => []),
@@ -115,7 +124,7 @@ export default function App() {
       setTransactions(txns || []);
       setNotifications(notifs || []);
 
-      if (me.role === 'admin') {
+      if (me && me.role === 'admin') {
         const [uList, stats] = await Promise.all([
           api.admin.getUsers().catch(() => []),
           api.admin.getAnalytics().catch(() => null)
@@ -123,11 +132,8 @@ export default function App() {
         setUsersList(uList || []);
         if (stats) setAnalytics(stats);
       }
-    } catch (err) {
-      console.warn('Authentication token invalid or expired. Resetting session.', err?.message || err);
-      tokenStorage.clear();
-      localStorage.removeItem('investpro_demo_user');
-      setUser(null);
+    } catch (dataErr) {
+      console.warn('Error fetching secondary user data:', dataErr?.message || dataErr);
     }
   }, []);
 
@@ -141,16 +147,17 @@ export default function App() {
     init();
   }, [loadProducts, loadUserData]);
 
-  // Periodic Polling for Data & Notification Refresh (Every 5 Seconds + Tab Focus)
+  // Periodic Polling for Data & Notification Refresh (Every 8 Seconds + Tab Focus)
+  const currentUserId = user?.id;
   useEffect(() => {
-    if (!user) return;
+    if (!currentUserId) return;
 
     const refreshAll = () => {
       loadUserData();
       loadProducts();
     };
 
-    const interval = setInterval(refreshAll, 5000);
+    const interval = setInterval(refreshAll, 8000);
 
     const handleFocus = () => {
       if (document.visibilityState === 'visible') {
@@ -166,7 +173,7 @@ export default function App() {
       window.removeEventListener('visibilitychange', handleFocus);
       window.removeEventListener('focus', handleFocus);
     };
-  }, [user, loadUserData, loadProducts]);
+  }, [currentUserId, loadUserData, loadProducts]);
 
   // Notification Handlers
   const handleMarkNotificationRead = async (id) => {

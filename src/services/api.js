@@ -34,6 +34,12 @@ async function fetchApi(endpoint, options = {}) {
   }
 
   if (!response.ok) {
+    if ((response.status === 401 || response.status === 403) &&
+        !endpoint.includes('/api/auth/login') &&
+        !endpoint.includes('/api/auth/register') &&
+        !endpoint.includes('/api/auth/recover-password')) {
+      tokenStorage.clear();
+    }
     const errorMsg = data?.error || `Request failed with status ${response.status}`;
     throw new Error(errorMsg);
   }
