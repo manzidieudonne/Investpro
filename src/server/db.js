@@ -1,6 +1,134 @@
 import fs from 'fs';
 import path from 'path';
 import bcrypt from 'bcryptjs';
+import mongoose from 'mongoose';
+
+// ==========================================
+// MONGOOSE SCHEMAS & MODELS
+// ==========================================
+
+const userSchema = new mongoose.Schema({
+  id: { type: String, required: true, unique: true, index: true },
+  email: { type: String, required: true, lowercase: true, trim: true },
+  passwordHash: { type: String, required: true },
+  fullName: { type: String, required: true, trim: true },
+  phone: { type: String, required: true, trim: true },
+  phoneClean: { type: String, index: true },
+  role: { type: String, enum: ['client', 'agent', 'admin'], default: 'client', index: true },
+  balance: { type: Number, default: 0 },
+  bonusBalance: { type: Number, default: 0 },
+  referralCode: { type: String, index: true },
+  agentCode: { type: String, index: true },
+  agentPaymentNumber: { type: String },
+  agentMomoName: { type: String },
+  referredBy: { type: String, index: true },
+  avatarUrl: { type: String },
+  status: { type: String, default: 'active', index: true },
+  createdAt: { type: String, default: () => new Date().toISOString() }
+}, { timestamps: true });
+
+const productSchema = new mongoose.Schema({
+  id: { type: String, required: true, unique: true, index: true },
+  title: { type: String, required: true },
+  description: { type: String },
+  price: { type: Number, required: true },
+  dailyProfit: { type: Number, required: true },
+  dailyProfitPercent: { type: Number, required: true },
+  durationDays: { type: Number, required: true },
+  category: { type: String, default: 'General' },
+  riskLevel: { type: String, default: 'Medium' },
+  active: { type: Boolean, default: true, index: true },
+  profitPayoutMode: { type: String, default: 'automatic' },
+  payoutIntervalHours: { type: Number, default: 24 }
+}, { timestamps: true });
+
+const investmentSchema = new mongoose.Schema({
+  id: { type: String, required: true, unique: true, index: true },
+  userId: { type: String, required: true, index: true },
+  productId: { type: String, required: true },
+  productTitle: { type: String, required: true },
+  amount: { type: Number, required: true },
+  dailyProfit: { type: Number, required: true },
+  totalClaimedProfit: { type: Number, default: 0 },
+  unclaimedYield: { type: Number, default: 0 },
+  payoutIntervalHours: { type: Number, default: 24 },
+  profitPayoutMode: { type: String, default: 'automatic' },
+  status: { type: String, default: 'active', index: true },
+  startDate: { type: String, required: true },
+  endDate: { type: String, required: true },
+  lastClaimedAt: { type: String, required: true }
+}, { timestamps: true });
+
+const depositSchema = new mongoose.Schema({
+  id: { type: String, required: true, unique: true, index: true },
+  userId: { type: String, required: true, index: true },
+  userName: { type: String },
+  userEmail: { type: String },
+  amount: { type: Number, required: true },
+  paymentMethod: { type: String, required: true },
+  transactionRef: { type: String, required: true },
+  agentCode: { type: String, index: true },
+  agentId: { type: String, index: true },
+  agentEmail: { type: String },
+  status: { type: String, default: 'pending', index: true },
+  processedAt: { type: String },
+  processedBy: { type: String },
+  rejectionReason: { type: String },
+  createdAt: { type: String, default: () => new Date().toISOString() }
+}, { timestamps: true });
+
+const withdrawalSchema = new mongoose.Schema({
+  id: { type: String, required: true, unique: true, index: true },
+  userId: { type: String, required: true, index: true },
+  userName: { type: String },
+  userEmail: { type: String },
+  amount: { type: Number, required: true },
+  paymentMethod: { type: String, required: true },
+  bankOrWalletDetails: { type: String, required: true },
+  status: { type: String, default: 'pending', index: true },
+  processedAt: { type: String },
+  processedByAdmin: { type: String },
+  rejectionReason: { type: String },
+  createdAt: { type: String, default: () => new Date().toISOString() }
+}, { timestamps: true });
+
+const transactionSchema = new mongoose.Schema({
+  id: { type: String, required: true, unique: true, index: true },
+  userId: { type: String, required: true, index: true },
+  type: { type: String, required: true, index: true },
+  amount: { type: Number, required: true },
+  status: { type: String, default: 'completed', index: true },
+  description: { type: String },
+  referenceId: { type: String, index: true },
+  agentId: { type: String, index: true },
+  createdAt: { type: String, default: () => new Date().toISOString() }
+}, { timestamps: true });
+
+const notificationSchema = new mongoose.Schema({
+  id: { type: String, required: true, unique: true, index: true },
+  userId: { type: String, required: true, index: true },
+  title: { type: String, required: true },
+  message: { type: String, required: true },
+  type: { type: String, default: 'general' },
+  read: { type: Boolean, default: false, index: true },
+  referenceId: { type: String },
+  amount: { type: Number },
+  clientName: { type: String },
+  clientEmail: { type: String },
+  createdAt: { type: String, default: () => new Date().toISOString() }
+}, { timestamps: true });
+
+export const UserModel = mongoose.models.User || mongoose.model('User', userSchema);
+export const ProductModel = mongoose.models.Product || mongoose.model('Product', productSchema);
+export const InvestmentModel = mongoose.models.Investment || mongoose.model('Investment', investmentSchema);
+export const DepositModel = mongoose.models.Deposit || mongoose.model('Deposit', depositSchema);
+export const WithdrawalModel = mongoose.models.Withdrawal || mongoose.model('Withdrawal', withdrawalSchema);
+export const TransactionModel = mongoose.models.Transaction || mongoose.model('Transaction', transactionSchema);
+export const NotificationModel = mongoose.models.Notification || mongoose.model('Notification', notificationSchema);
+
+// ==========================================
+// FILE BACKUP FALLBACK HELPER
+// ==========================================
 
 const getWritableDataDir = () => {
   const localDir = path.join(process.cwd(), 'data');
@@ -28,7 +156,6 @@ const getWritableDataDir = () => {
 const DATA_DIR = getWritableDataDir();
 const DB_FILE = path.join(DATA_DIR, 'db.json');
 
-// Default Seed Data
 const getInitialSeedData = () => {
   const salt = bcrypt.genSaltSync(10);
   const habimanaAdminHash = bcrypt.hashSync('habimana', salt);
@@ -155,19 +282,90 @@ const getInitialSeedData = () => {
   };
 };
 
+// ==========================================
+// HIGH PERFORMANCE DB MANAGER & CACHE ENGINE
+// ==========================================
+
 class DBManager {
   constructor() {
-    this.data = this.loadData();
+    this.mongoConnected = false;
+    this.data = this.loadLocalBackupData();
     this.ensurePhoneIndexes();
+    this.initMongoDB();
   }
 
-  loadData() {
+  // Connect to MongoDB with High Performance Pool
+  async initMongoDB() {
+    const mongoUri = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/investpro';
+    try {
+      console.log('Connecting to MongoDB database...');
+      await mongoose.connect(mongoUri, {
+        serverSelectionTimeoutMS: 3000, // Fast timeout for immediate fallback if local daemon unhosted
+        maxPoolSize: 50, // High-performance connection pool for concurrent users
+        minPoolSize: 5
+      });
+      this.mongoConnected = true;
+      console.log('✅ MongoDB connected successfully! Performance engine active.');
+
+      // Hydrate MongoDB from seed if database collections are empty
+      await this.seedMongoDBIfEmpty();
+      // Load latest data from MongoDB into ultra-fast in-memory cache
+      await this.syncFromMongoDB();
+    } catch (err) {
+      console.warn('⚠️ MongoDB connection deferred (using persistent file/memory engine):', err.message);
+      this.mongoConnected = false;
+    }
+  }
+
+  async seedMongoDBIfEmpty() {
+    if (!this.mongoConnected) return;
+    try {
+      const userCount = await UserModel.countDocuments();
+      if (userCount === 0) {
+        console.log('Seeding MongoDB initial collections...');
+        const seed = getInitialSeedData();
+        await UserModel.insertMany(seed.users);
+        await ProductModel.insertMany(seed.products);
+      }
+    } catch (e) {
+      console.warn('MongoDB seed check error:', e.message);
+    }
+  }
+
+  async syncFromMongoDB() {
+    if (!this.mongoConnected) return;
+    try {
+      const [users, products, investments, deposits, withdrawals, transactions, notifications] = await Promise.all([
+        UserModel.find().lean(),
+        ProductModel.find().lean(),
+        InvestmentModel.find().lean(),
+        DepositModel.find().lean(),
+        WithdrawalModel.find().lean(),
+        TransactionModel.find().lean(),
+        NotificationModel.find().lean()
+      ]);
+
+      this.data = {
+        users: users.map(u => ({ ...u, _id: undefined, __v: undefined })),
+        products: products.map(p => ({ ...p, _id: undefined, __v: undefined })),
+        investments: investments.map(i => ({ ...i, _id: undefined, __v: undefined })),
+        deposits: deposits.map(d => ({ ...d, _id: undefined, __v: undefined })),
+        withdrawals: withdrawals.map(w => ({ ...w, _id: undefined, __v: undefined })),
+        transactions: transactions.map(t => ({ ...t, _id: undefined, __v: undefined })),
+        notifications: notifications.map(n => ({ ...n, _id: undefined, __v: undefined }))
+      };
+      this.ensurePhoneIndexes();
+    } catch (e) {
+      console.warn('MongoDB sync to memory failed:', e.message);
+    }
+  }
+
+  loadLocalBackupData() {
     try {
       if (fs.existsSync(DB_FILE)) {
         const fileContent = fs.readFileSync(DB_FILE, 'utf-8');
         const parsed = JSON.parse(fileContent);
 
-        // Merge missing tables if file was created with an older schema
         const seed = getInitialSeedData();
         return {
           users: parsed.users || seed.users,
@@ -197,7 +395,22 @@ class DBManager {
   }
 
   saveData() {
+    // Write-Through to file backup synchronously
     this.saveDataDirect(this.data);
+  }
+
+  // Non-blocking MongoDB persistence helper
+  async syncMongoDoc(model, idField, data, isDelete = false) {
+    if (!this.mongoConnected) return;
+    try {
+      if (isDelete) {
+        await model.deleteOne({ id: idField });
+      } else {
+        await model.updateOne({ id: idField }, { $set: data }, { upsert: true });
+      }
+    } catch (e) {
+      console.warn(`MongoDB async update failed for ${model.modelName}:`, e.message);
+    }
   }
 
   cleanPhone(phone) {
@@ -221,7 +434,6 @@ class DBManager {
   toSafeUser(user) {
     if (!user) return user;
 
-    // Calculate referral count dynamically based on clients who used this user's ID, agentCode or referralCode
     let referralCount = 0;
     if (this.data && this.data.users) {
       referralCount = this.data.users.filter(u => {
@@ -240,7 +452,9 @@ class DBManager {
     };
   }
 
+  // ==========================================
   // USER OPERATIONS
+  // ==========================================
   getAllUsers() {
     return this.data.users.map(u => this.toSafeUser(u));
   }
@@ -293,11 +507,10 @@ class DBManager {
     const userId = 'usr-' + Math.random().toString(36).substring(2, 11);
     const userReferralCode = 'REF-' + Math.random().toString(36).substring(2, 8).toUpperCase();
 
-    // Give referral bonus to referrer if valid
     if (userData.referredBy) {
       const referrer = this.data.users.find(u => u.id === userData.referredBy || u.referralCode === userData.referredBy || u.agentCode === userData.referredBy);
       if (referrer) {
-        referrer.bonusBalance = (referrer.bonusBalance || 0) + 500; // 500 FRW signup bonus
+        referrer.bonusBalance = (referrer.bonusBalance || 0) + 500;
         this.createTransaction({
           userId: referrer.id,
           type: 'referral_bonus',
@@ -327,6 +540,7 @@ class DBManager {
 
     this.data.users.push(newUser);
     this.saveData();
+    this.syncMongoDoc(UserModel, userId, newUser);
 
     return this.toSafeUser(newUser);
   }
@@ -340,25 +554,35 @@ class DBManager {
       updates.phoneClean = this.cleanPhone(updates.phone);
     }
 
-    this.data.users[userIndex] = {
+    const updated = {
       ...current,
       ...updates
     };
 
+    this.data.users[userIndex] = updated;
     this.saveData();
-    return this.toSafeUser(this.data.users[userIndex]);
+    this.syncMongoDoc(UserModel, id, updated);
+
+    return this.toSafeUser(updated);
   }
 
   deleteUser(id) {
     const initialCount = this.data.users.length;
     this.data.users = this.data.users.filter(u => u.id !== id);
     if (this.data.users.length !== initialCount) {
-      // Clean associated records
       this.data.investments = this.data.investments.filter(i => i.userId !== id);
       this.data.deposits = this.data.deposits.filter(d => d.userId !== id);
       this.data.withdrawals = this.data.withdrawals.filter(w => w.userId !== id);
       this.data.notifications = this.data.notifications.filter(n => n.userId !== id);
       this.saveData();
+
+      if (this.mongoConnected) {
+        UserModel.deleteOne({ id }).catch(() => {});
+        InvestmentModel.deleteMany({ userId: id }).catch(() => {});
+        DepositModel.deleteMany({ userId: id }).catch(() => {});
+        WithdrawalModel.deleteMany({ userId: id }).catch(() => {});
+        NotificationModel.deleteMany({ userId: id }).catch(() => {});
+      }
       return true;
     }
     return false;
@@ -369,12 +593,15 @@ class DBManager {
     if (user) {
       user.balance = Math.max(0, (user.balance || 0) + amount);
       this.saveData();
+      this.syncMongoDoc(UserModel, id, { balance: user.balance });
       return user.balance;
     }
     return 0;
   }
 
+  // ==========================================
   // PRODUCT OPERATIONS
+  // ==========================================
   getAllProducts() {
     return this.data.products;
   }
@@ -390,6 +617,7 @@ class DBManager {
     };
     this.data.products.push(newProduct);
     this.saveData();
+    this.syncMongoDoc(ProductModel, newProduct.id, newProduct);
     return newProduct;
   }
 
@@ -403,6 +631,7 @@ class DBManager {
     };
 
     this.saveData();
+    this.syncMongoDoc(ProductModel, id, this.data.products[idx]);
     return this.data.products[idx];
   }
 
@@ -411,12 +640,15 @@ class DBManager {
     if (idx !== -1) {
       this.data.products.splice(idx, 1);
       this.saveData();
+      this.syncMongoDoc(ProductModel, id, null, true);
       return true;
     }
     return false;
   }
 
+  // ==========================================
   // INVESTMENT OPERATIONS
+  // ==========================================
   getAllInvestments() {
     this.accrueAllInvestments();
     return this.data.investments;
@@ -440,8 +672,8 @@ class DBManager {
       };
     }
 
-    // Deduct purchase price from user balance
     user.balance -= product.price;
+    this.syncMongoDoc(UserModel, user.id, { balance: user.balance });
 
     const now = new Date();
     const endDate = new Date(now.getTime() + product.durationDays * 24 * 60 * 60 * 1000);
@@ -465,7 +697,6 @@ class DBManager {
 
     this.data.investments.push(investment);
 
-    // Record Transaction
     this.createTransaction({
       userId,
       type: 'investment',
@@ -475,10 +706,11 @@ class DBManager {
     });
 
     this.saveData();
+    this.syncMongoDoc(InvestmentModel, investment.id, investment);
+
     return { investment };
   }
 
-  // Daily yield accrual engine
   accrueAllInvestments() {
     const now = new Date();
     let updated = false;
@@ -486,7 +718,6 @@ class DBManager {
     this.data.investments.forEach(inv => {
       if (inv.status !== 'active') return;
 
-      const startDate = new Date(inv.startDate);
       const endDate = new Date(inv.endDate);
 
       if (now >= endDate) {
@@ -504,12 +735,13 @@ class DBManager {
 
         if (earnedAmount > 0) {
           if (inv.profitPayoutMode === 'automatic') {
-            // Credit directly to user wallet balance
             const user = this.data.users.find(u => u.id === inv.userId);
             if (user) {
               user.balance = (user.balance || 0) + earnedAmount;
               inv.totalClaimedProfit = (inv.totalClaimedProfit || 0) + earnedAmount;
               inv.lastClaimedAt = new Date(lastClaim.getTime() + intervalsToCredit * intervalMs).toISOString();
+
+              this.syncMongoDoc(UserModel, user.id, { balance: user.balance });
 
               this.createTransaction({
                 userId: inv.userId,
@@ -530,11 +762,11 @@ class DBManager {
               updated = true;
             }
           } else {
-            // Accrue to unclaimed yield for manual claim button
             inv.unclaimedYield = (inv.unclaimedYield || 0) + earnedAmount;
             inv.lastClaimedAt = new Date(lastClaim.getTime() + intervalsToCredit * intervalMs).toISOString();
             updated = true;
           }
+          this.syncMongoDoc(InvestmentModel, inv.id, inv);
         }
       }
     });
@@ -570,10 +802,15 @@ class DBManager {
     });
 
     this.saveData();
+    this.syncMongoDoc(UserModel, user.id, { balance: user.balance });
+    this.syncMongoDoc(InvestmentModel, inv.id, inv);
+
     return { claimedAmount: claimAmount };
   }
 
-  // AGENT CLIENT MANAGEMENT HELPERS
+  // ==========================================
+  // AGENT CLIENT MANAGEMENT
+  // ==========================================
   isClientOfAgent(clientId, agent) {
     const client = this.data.users.find(u => u.id === clientId);
     if (!client) return false;
@@ -599,7 +836,6 @@ class DBManager {
 
     let agentUser = undefined;
 
-    // First try matching client's agentCode
     if (client.agentCode) {
       agentUser = this.data.users.find(u =>
         (u.role === 'agent' || u.role === 'admin') &&
@@ -607,7 +843,6 @@ class DBManager {
       );
     }
 
-    // Next try referredBy ID or code
     if (!agentUser && client.referredBy) {
       agentUser = this.data.users.find(u =>
         (u.role === 'agent' || u.role === 'admin') &&
@@ -615,7 +850,6 @@ class DBManager {
       );
     }
 
-    // Default to default agent if no specific assignment
     if (!agentUser) {
       agentUser = this.data.users.find(u => u.role === 'agent');
     }
@@ -634,10 +868,14 @@ class DBManager {
     client.agentCode = agent.agentCode || agent.referralCode;
 
     this.saveData();
+    this.syncMongoDoc(UserModel, client.id, { referredBy: client.referredBy, agentCode: client.agentCode });
+
     return { success: true, user: this.toSafeUser(client) };
   }
 
+  // ==========================================
   // DEPOSIT OPERATIONS
+  // ==========================================
   createDepositRequest(userId, amount, paymentMethod, transactionRef, agentCode) {
     const user = this.data.users.find(u => u.id === userId);
     const assignedAgent = this.getAgentForClient(userId);
@@ -660,7 +898,6 @@ class DBManager {
     if (!this.data.deposits) this.data.deposits = [];
     this.data.deposits.unshift(deposit);
 
-    // Record pending transaction
     this.createTransaction({
       userId,
       type: 'deposit',
@@ -670,7 +907,6 @@ class DBManager {
       referenceId: deposit.id
     });
 
-    // Notify Agent / Admins about new deposit request
     if (assignedAgent) {
       this.createNotification({
         userId: assignedAgent.id,
@@ -685,6 +921,8 @@ class DBManager {
     }
 
     this.saveData();
+    this.syncMongoDoc(DepositModel, deposit.id, deposit);
+
     return deposit;
   }
 
@@ -719,7 +957,6 @@ class DBManager {
     if (!deposit) return { error: 'Deposit request not found' };
     if (deposit.status !== 'pending') return { error: 'Deposit request has already been processed' };
 
-    // Strict Agent Check: Agent can ONLY process deposits for assigned clients
     if (processorUser.role === 'agent') {
       if (!this.isClientOfAgent(deposit.userId, processorUser)) {
         return {
@@ -733,18 +970,16 @@ class DBManager {
       deposit.processedAt = new Date().toISOString();
       deposit.processedBy = `${processorUser.fullName} (${processorUser.role})`;
 
-      // Credit client's wallet balance
       this.adjustUserBalance(deposit.userId, deposit.amount);
 
-      // Update associated pending transaction to completed
       const txn = this.data.transactions.find(t => t.referenceId === deposit.id);
       if (txn) {
         txn.status = 'completed';
         txn.agentId = processorUser.id;
         txn.description = `Kubitsa (${deposit.amount.toLocaleString('en-US')} FRW) byaguzwe no kwemezwa na Agent ${processorUser.fullName}`;
+        this.syncMongoDoc(TransactionModel, txn.id, txn);
       }
 
-      // Notify client
       this.createNotification({
         userId: deposit.userId,
         title: 'Kwemeza Kubitsa Kwemejwe! ✅',
@@ -764,6 +999,7 @@ class DBManager {
         txn.status = 'rejected';
         txn.agentId = processorUser.id;
         txn.description = `Kubitsa byanzwe: ${reason || 'Impamvu zitazwi'}`;
+        this.syncMongoDoc(TransactionModel, txn.id, txn);
       }
 
       this.createNotification({
@@ -777,10 +1013,14 @@ class DBManager {
     }
 
     this.saveData();
+    this.syncMongoDoc(DepositModel, deposit.id, deposit);
+
     return { deposit };
   }
 
+  // ==========================================
   // WITHDRAWAL OPERATIONS
+  // ==========================================
   createWithdrawalRequest(userId, amount, paymentMethod, bankOrWalletDetails) {
     const user = this.data.users.find(u => u.id === userId);
     if (!user) return { error: 'User not found' };
@@ -791,7 +1031,6 @@ class DBManager {
       };
     }
 
-    // Lock/deduct withdrawal amount from user's available balance immediately
     this.adjustUserBalance(userId, -amount);
 
     const assignedAgent = this.getAgentForClient(userId);
@@ -811,7 +1050,6 @@ class DBManager {
     if (!this.data.withdrawals) this.data.withdrawals = [];
     this.data.withdrawals.unshift(newWithdrawal);
 
-    // Record pending transaction log
     this.createTransaction({
       userId,
       type: 'withdrawal',
@@ -821,7 +1059,6 @@ class DBManager {
       referenceId: newWithdrawal.id
     });
 
-    // Notify Agent / Admin
     if (assignedAgent) {
       this.createNotification({
         userId: assignedAgent.id,
@@ -836,6 +1073,8 @@ class DBManager {
     }
 
     this.saveData();
+    this.syncMongoDoc(WithdrawalModel, newWithdrawal.id, newWithdrawal);
+
     return { withdrawal: newWithdrawal };
   }
 
@@ -872,7 +1111,6 @@ class DBManager {
 
     const withdrawalAmount = Number(withdrawal.amount || 0);
 
-    // Strict Agent Check: Agent can ONLY process withdrawals for assigned clients
     if (processorUser.role === 'agent') {
       if (!this.isClientOfAgent(withdrawal.userId, processorUser)) {
         return {
@@ -887,12 +1125,12 @@ class DBManager {
       withdrawal.processedAt = new Date().toISOString();
       withdrawal.processedByAdmin = `${processorUser.fullName} (${processorUser.role})`;
 
-      // Update associated transaction
       const txn = this.data.transactions.find(t => t.referenceId === withdrawal.id);
       if (txn) {
         txn.status = 'completed';
         txn.agentId = processorUser.id;
         txn.description = `Kubikuriza (${withdrawalAmount.toLocaleString('en-US')} FRW) byemejwe na ${processorUser.fullName} [${withdrawal.paymentMethod}]`;
+        this.syncMongoDoc(TransactionModel, txn.id, txn);
       }
     } else {
       withdrawal.status = 'rejected';
@@ -901,7 +1139,6 @@ class DBManager {
       withdrawal.processedAt = new Date().toISOString();
       withdrawal.processedByAdmin = `${processorUser.fullName} (${processorUser.role})`;
 
-      // Refund locked amount back to client balance!
       this.adjustUserBalance(withdrawal.userId, withdrawalAmount);
 
       const txn = this.data.transactions.find(t => t.referenceId === withdrawal.id);
@@ -909,10 +1146,10 @@ class DBManager {
         txn.status = 'rejected';
         txn.agentId = processorUser.id;
         txn.description = `Kubikuriza byanzwe no gusubizwa kuri konti (${withdrawalAmount.toLocaleString('en-US')} FRW)`;
+        this.syncMongoDoc(TransactionModel, txn.id, txn);
       }
     }
 
-    // Notify client about withdrawal decision
     this.createNotification({
       userId: withdrawal.userId,
       title: action === 'approve' ? 'Withdrawal Yawe Yemejwe! ✅' : 'Withdrawal Yawe Yanzwe ❌',
@@ -925,6 +1162,8 @@ class DBManager {
     });
 
     this.saveData();
+    this.syncMongoDoc(WithdrawalModel, withdrawal.id, withdrawal);
+
     return { withdrawal };
   }
 
@@ -982,6 +1221,8 @@ class DBManager {
     if (updates.rejectionReason !== undefined) deposit.rejectionReason = updates.rejectionReason;
 
     this.saveData();
+    this.syncMongoDoc(DepositModel, deposit.id, deposit);
+
     return { deposit };
   }
 
@@ -998,7 +1239,10 @@ class DBManager {
     this.data.deposits.splice(idx, 1);
     if (!this.data.transactions) this.data.transactions = [];
     this.data.transactions = this.data.transactions.filter(t => t.referenceId !== depositId);
+
     this.saveData();
+    this.syncMongoDoc(DepositModel, depositId, null, true);
+
     return true;
   }
 
@@ -1052,6 +1296,8 @@ class DBManager {
     if (updates.rejectionReason !== undefined) withdrawal.rejectionReason = updates.rejectionReason;
 
     this.saveData();
+    this.syncMongoDoc(WithdrawalModel, withdrawal.id, withdrawal);
+
     return { withdrawal };
   }
 
@@ -1068,11 +1314,16 @@ class DBManager {
     this.data.withdrawals.splice(idx, 1);
     if (!this.data.transactions) this.data.transactions = [];
     this.data.transactions = this.data.transactions.filter(t => t.referenceId !== withdrawalId);
+
     this.saveData();
+    this.syncMongoDoc(WithdrawalModel, withdrawalId, null, true);
+
     return true;
   }
 
+  // ==========================================
   // NOTIFICATION OPERATIONS
+  // ==========================================
   createNotification(notificationData) {
     if (!this.data.notifications) this.data.notifications = [];
     const notif = {
@@ -1090,6 +1341,8 @@ class DBManager {
     };
     this.data.notifications.unshift(notif);
     this.saveData();
+    this.syncMongoDoc(NotificationModel, notif.id, notif);
+
     return notif;
   }
 
@@ -1104,6 +1357,7 @@ class DBManager {
     if (notif) {
       notif.read = true;
       this.saveData();
+      this.syncMongoDoc(NotificationModel, notif.id, { read: true });
       return true;
     }
     return false;
@@ -1116,13 +1370,16 @@ class DBManager {
       if (n.userId === userId && !n.read) {
         n.read = true;
         updated = true;
+        this.syncMongoDoc(NotificationModel, n.id, { read: true });
       }
     });
     if (updated) this.saveData();
     return updated;
   }
 
+  // ==========================================
   // TRANSACTIONS LOG
+  // ==========================================
   createTransaction(txnData) {
     const txn = {
       ...txnData,
@@ -1131,6 +1388,8 @@ class DBManager {
     };
     this.data.transactions.unshift(txn);
     this.saveData();
+    this.syncMongoDoc(TransactionModel, txn.id, txn);
+
     return txn;
   }
 
